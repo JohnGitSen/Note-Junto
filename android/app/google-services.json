@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "145914157424",
+    "project_id": "note-application-daeef",
+    "storage_bucket": "note-application-daeef.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:145914157424:android:82f5993d39afcf8297d7b5",
+        "android_client_info": {
+          "package_name": "com.example.firebase_setup"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZtL5bkFgNWcpwMsrkJZp12dMrQvrwhI4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:145914157424:android:7f2689955c24ba8a97d7b5",
+        "android_client_info": {
+          "package_name": "com.example.notesharingapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZtL5bkFgNWcpwMsrkJZp12dMrQvrwhI4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
