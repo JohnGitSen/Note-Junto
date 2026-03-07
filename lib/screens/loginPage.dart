@@ -21,6 +21,16 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(const AssetImage('lib/assets/loginPage.png'), context);
+    precacheImage(const AssetImage('lib/assets/emailBar.png'), context);
+    precacheImage(const AssetImage('lib/assets/passwordBar.png'), context);
+    precacheImage(const AssetImage('lib/assets/loginButton.png'), context);
+    precacheImage(const AssetImage('lib/assets/donthaveaccountText.png'), context);
+  }
+
+  @override
   void dispose() {
     _email.dispose();
     _password.dispose();
@@ -32,10 +42,13 @@ class _LoginPageState extends State<LoginPage> {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('lib/assets/loginPage.png', fit: BoxFit.fill),
+            child: RepaintBoundary(
+              child: Image.asset('lib/assets/loginPage.png', fit: BoxFit.fill),
+            ),
           ),
 
           // Email Bar Image
@@ -124,6 +137,7 @@ class _LoginPageState extends State<LoginPage> {
             right: 0,
             child: Center(
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () async {
                   final email = _email.text;
                   final password = _password.text;
@@ -153,6 +167,7 @@ class _LoginPageState extends State<LoginPage> {
             right: 0,
             child: Center(
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
                   Navigator.pushNamed(context, '/setupPage/registerPage');
                 },

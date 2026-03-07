@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:notesharingapp/utils/SnackBarUtils.dart';
@@ -10,14 +11,14 @@ class RegisterPage extends StatefulWidget {
 }
 
 class RegisterPageState extends State<RegisterPage> {
-  // late final TextEditingController _username;
+  late final TextEditingController _username;
   late final TextEditingController _email;
   late final TextEditingController _password;
   late final TextEditingController _confirmpassword;
 
   @override
   void initState() {
-    //    _username = TextEditingController();
+    _username = TextEditingController();
     _email = TextEditingController();
     _password = TextEditingController();
     _confirmpassword = TextEditingController();
@@ -26,7 +27,7 @@ class RegisterPageState extends State<RegisterPage> {
 
   @override
   void dispose() {
-    //    _username.dispose();
+    _username.dispose();
     _email.dispose();
     _password.dispose();
     _confirmpassword.dispose();
@@ -38,6 +39,7 @@ class RegisterPageState extends State<RegisterPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned.fill(
@@ -64,7 +66,7 @@ class RegisterPageState extends State<RegisterPage> {
               child: SizedBox(
                 width: screenWidth * 0.68,
                 child: TextFormField(
-                  // controller: _username,
+                  controller: _username,
                   decoration: InputDecoration(
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
@@ -201,10 +203,17 @@ class RegisterPageState extends State<RegisterPage> {
             right: 0,
             child: Center(
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () async {
-                  final email = _email.text;
+                  final username = _username.text.trim();
+                  final email = _email.text.trim();
                   final password = _password.text;
                   final confirmpassword = _confirmpassword.text;
+
+                  if (username.isEmpty) {
+                    buildSnackBar(context, "Please enter a username");
+                    return;
+                  }
 
                   if (password == confirmpassword) {
                     try {
@@ -213,6 +222,34 @@ class RegisterPageState extends State<RegisterPage> {
                             email: email,
                             password: password,
                           );
+
+                      // Save user to Firestore with UID as document ID
+                      await FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(userCredential.user!.uid)
+                          .set({
+                            'uid': userCredential.user!.uid,
+                            'username': username,
+                            'email': email,
+                            'createdAt': FieldValue.serverTimestamp(),
+                          });
+
+                      if (mounted) {
+                        buildSnackBar(
+                          context,
+                          "Account created successfully!",
+                          backgroundColor: const Color.fromARGB(
+                            255,
+                            99,
+                            167,
+                            255,
+                          ),
+                        );
+                        Navigator.pushReplacementNamed(
+                          context,
+                          '/setupPage/loginPage',
+                        );
+                      }
                     } on FirebaseAuthException catch (e) {
                       if (e.code == 'weak-password') {
                         buildSnackBar(
@@ -246,6 +283,7 @@ class RegisterPageState extends State<RegisterPage> {
             right: 0,
             child: Center(
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
                   Navigator.pushNamed(context, '/setupPage/loginPage');
                 },

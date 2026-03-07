@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:notesharingapp/NavBarScreens/createNotesScreen.dart';
+import 'package:notesharingapp/NavBarScreens/editViewNotesScreen.dart';
 import 'package:notesharingapp/screens/setupPage.dart';
 import 'firebase_options.dart';
 import 'screens/landingPage.dart';
@@ -33,7 +34,9 @@ class MyApp extends StatelessWidget {
       ],
       debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      ),
       initialRoute: '/',
       routes: {
         '/': (context) => Landingpage(),
@@ -43,6 +46,7 @@ class MyApp extends StatelessWidget {
         '/mainAppPage': (context) => MainAppPage(),
         '/landingPage/mainAppPage/CreateNotesPage': (context) =>
             CreateNotesPage(),
+        '/editViewNotesScreen': (context) => EditViewNotesScreen(),
       },
     );
   }

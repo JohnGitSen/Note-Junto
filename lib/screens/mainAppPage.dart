@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:notesharingapp/NavBarScreens/myNotesScreen.dart';
@@ -13,6 +14,48 @@ class MainAppPage extends StatefulWidget {
 
 class _MainAppPageState extends State<MainAppPage> {
   int _selectedIndex = 0;
+  String _username = '';
+  Color _avatarColor = Colors.blueGrey;
+
+  // Fixed list of nice avatar colors
+  static const List<Color> _avatarColors = [
+    Color.fromARGB(255, 99, 136, 255),
+    Color.fromARGB(255, 255, 99, 132),
+    Color.fromARGB(255, 99, 200, 132),
+    Color.fromARGB(255, 255, 165, 0),
+    Color.fromARGB(255, 180, 99, 255),
+    Color.fromARGB(255, 0, 188, 212),
+    Color.fromARGB(255, 255, 87, 34),
+    Color.fromARGB(255, 76, 175, 80),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsername();
+  }
+
+  Future<void> _loadUsername() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+
+    if (doc.exists && mounted) {
+      final username = doc.data()?['username'] as String? ?? '';
+      // Pick a color based on first letter so it's always consistent per user
+      final colorIndex = username.isNotEmpty
+          ? username.codeUnitAt(0) % _avatarColors.length
+          : 0;
+      setState(() {
+        _username = username;
+        _avatarColor = _avatarColors[colorIndex];
+      });
+    }
+  }
 
   void _selectionBottomBar(int index) {
     setState(() {
@@ -54,7 +97,7 @@ class _MainAppPageState extends State<MainAppPage> {
       items: [
         PopupMenuItem(
           onTap: () {
-            // Navigate to view account screen , ala pa ako idea
+            // Navigate to view account screen
           },
           child: Row(
             children: const [
@@ -104,6 +147,8 @@ class _MainAppPageState extends State<MainAppPage> {
 
   @override
   Widget build(BuildContext context) {
+    final firstLetter = _username.isNotEmpty ? _username[0].toUpperCase() : '?';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("My Notes"),
@@ -116,16 +161,16 @@ class _MainAppPageState extends State<MainAppPage> {
         leading: Builder(
           builder: (ctx) => IconButton(
             onPressed: () => _showUserMenu(ctx),
-            icon: Container(
-              decoration: const BoxDecoration(
-                color: Color.fromARGB(255, 210, 210, 210),
-                shape: BoxShape.circle,
-              ),
-              padding: const EdgeInsets.all(4),
-              child: const Icon(
-                Icons.person,
-                color: Color.fromARGB(255, 60, 60, 60),
-                size: 22,
+            icon: CircleAvatar(
+              backgroundColor: _avatarColor,
+              radius: 18,
+              child: Text(
+                firstLetter,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ),
           ),
