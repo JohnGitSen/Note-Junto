@@ -4,7 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
 class EditViewNotesScreen extends StatefulWidget {
-  const EditViewNotesScreen({super.key});
+  final String noteId;
+  final String title;
+  final String body;
+  final bool isShared;
+
+  const EditViewNotesScreen({
+    super.key,
+    required this.noteId,
+    required this.title,
+    required this.body,
+    required this.isShared,
+  });
 
   @override
   State<EditViewNotesScreen> createState() => _EditViewNotesScreenState();
@@ -13,34 +24,15 @@ class EditViewNotesScreen extends StatefulWidget {
 class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
   late QuillController _controller;
   late TextEditingController _titleController;
-  bool _isLoading = true;
   bool _isSaving = false;
-  late String _noteId;
-  late bool _isShared;
 
   @override
   void initState() {
     super.initState();
-    _controller = QuillController.basic();
-    _titleController = TextEditingController();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_isLoading) return;
-
-    final args =
-        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-
-    _noteId = args['noteId'] as String;
-    _isShared = args['isShared'] as bool? ?? false;
-    _titleController.text = args['title'] as String? ?? '';
-
-    final bodyJson = args['body'] as String? ?? '[]';
+    _titleController = TextEditingController(text: widget.title);
 
     try {
-      final doc = Document.fromJson(jsonDecode(bodyJson));
+      final doc = Document.fromJson(jsonDecode(widget.body));
       _controller = QuillController(
         document: doc,
         selection: const TextSelection.collapsed(offset: 0),
@@ -48,8 +40,6 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
     } catch (_) {
       _controller = QuillController.basic();
     }
-
-    setState(() => _isLoading = false);
   }
 
   @override
@@ -63,21 +53,22 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
     setState(() => _isSaving = true);
     try {
       final bodyJson = jsonEncode(_controller.document.toDelta().toJson());
-      await FirebaseFirestore.instance.collection('notes').doc(_noteId).update({
+      await FirebaseFirestore.instance
+          .collection('notes')
+          .doc(widget.noteId)
+          .update({
         'title': _titleController.text.trim(),
         'body': bodyJson,
         'updatedAt': FieldValue.serverTimestamp(),
       });
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Note saved!')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Note saved!')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to save: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -86,17 +77,6 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color.fromARGB(255, 214, 215, 216),
-        body: Center(
-          child: CircularProgressIndicator(
-            color: Color.fromARGB(255, 177, 206, 255),
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       resizeToAvoidBottomInset: true,
       backgroundColor: const Color.fromARGB(255, 214, 215, 216),
@@ -140,7 +120,7 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
                     size: 30,
                   ),
                 ),
-          if (_isShared)
+          if (widget.isShared)
             IconButton(
               onPressed: () {},
               icon: const Icon(

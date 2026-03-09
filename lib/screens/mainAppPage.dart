@@ -17,7 +17,6 @@ class _MainAppPageState extends State<MainAppPage> {
   String _username = '';
   Color _avatarColor = Colors.blueGrey;
 
-  // Fixed list of nice avatar colors
   static const List<Color> _avatarColors = [
     Color.fromARGB(255, 99, 136, 255),
     Color.fromARGB(255, 255, 99, 132),
@@ -46,7 +45,6 @@ class _MainAppPageState extends State<MainAppPage> {
 
     if (doc.exists && mounted) {
       final username = doc.data()?['username'] as String? ?? '';
-      // Pick a color based on first letter so it's always consistent per user
       final colorIndex = username.isNotEmpty
           ? username.codeUnitAt(0) % _avatarColors.length
           : 0;

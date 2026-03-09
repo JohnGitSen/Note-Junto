@@ -17,7 +17,28 @@ void main() async {
   runApp(const MyApp());
   print(
     'Firebase initialized: ${Firebase.app().name}',
-  ); // Kapag [DEFAULT] goods siya :)
+  ); // Kapag [DEFAULT] goods siya :) , Initialization ng firebase to
+}
+
+Route _smoothRoute(Widget page) {
+  return PageRouteBuilder(
+    transitionDuration: const Duration(milliseconds: 300),
+    pageBuilder: (context, animation, secondaryAnimation) => page,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final tween = Tween(
+        begin: 0.0,
+        end: 1.0,
+      ).chain(CurveTween(curve: Curves.fastOutSlowIn));
+
+      return FadeTransition(
+        opacity: animation.drive(tween),
+        child: ScaleTransition(
+          scale: Tween(begin: 0.95, end: 1.0).animate(animation),
+          child: child,
+        ),
+      );
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -33,20 +54,38 @@ class MyApp extends StatelessWidget {
         FlutterQuillLocalizations.delegate,
       ],
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Demo',
+      title: 'Note Junto',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       initialRoute: '/',
-      routes: {
-        '/': (context) => Landingpage(),
-        '/setupPage': (context) => Setuppage(),
-        '/setupPage/loginPage': (context) => LoginPage(),
-        '/setupPage/registerPage': (context) => RegisterPage(),
-        '/mainAppPage': (context) => MainAppPage(),
-        '/landingPage/mainAppPage/CreateNotesPage': (context) =>
-            CreateNotesPage(),
-        '/editViewNotesScreen': (context) => EditViewNotesScreen(),
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/':
+            return _smoothRoute(Landingpage());
+          case '/setupPage':
+            return _smoothRoute(Setuppage());
+          case '/setupPage/loginPage':
+            return _smoothRoute(LoginPage());
+          case '/setupPage/registerPage':
+            return _smoothRoute(RegisterPage());
+          case '/mainAppPage':
+            return _smoothRoute(MainAppPage());
+          case '/landingPage/mainAppPage/CreateNotesPage':
+            return _smoothRoute(CreateNotesPage());
+          case '/editViewNotesScreen':
+            final args = settings.arguments as Map<String, dynamic>;
+            return _smoothRoute(
+              EditViewNotesScreen(
+                noteId: args['noteId'] as String,
+                title: args['title'] as String? ?? '',
+                body: args['body'] as String? ?? '[]',
+                isShared: args['isShared'] as bool? ?? false,
+              ),
+            );
+          default:
+            return _smoothRoute(Landingpage());
+        }
       },
     );
   }
