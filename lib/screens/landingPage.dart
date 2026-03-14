@@ -11,7 +11,8 @@ class Landingpage extends StatefulWidget {
 class _LandingpageState extends State<Landingpage> {
   @override
   Widget build(BuildContext context) {
-    // Get the current screen size
+    // For accurate size for images multiplying relative
+    // sa screen size. Para kapag minultiply ung image size relative dun sa image resolution.
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
@@ -28,6 +29,8 @@ class _LandingpageState extends State<Landingpage> {
             child: Center(
               child: GestureDetector(
                 onTap: () {
+                  // Checks kung ung user nag login na ba or may current user sa firebase.
+                  // If meron continue na agad sa mainpage and if non existing. Sa setup page sila ipupunta
                   final user = FirebaseAuth.instance.currentUser;
                   if (user != null) {
                     Navigator.pushNamed(context, '/mainAppPage');

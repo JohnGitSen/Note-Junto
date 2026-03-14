@@ -2,33 +2,38 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:notesharingapp/utils/SnackBarUtils.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
-  @override
-  State<LoginPage> createState() => _LoginPageState();
+// ── Call this from any page to show the login sheet ──────────────────────────
+void showLoginSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withOpacity(0.5),
+    useRootNavigator: true,
+    builder: (_) => const LoginSheet(),
+  );
 }
 
-class _LoginPageState extends State<LoginPage> {
-  @override
-  late final TextEditingController _email;
-  late final TextEditingController _password;
+// ─── Login Sheet (public) ─────────────────────────────────────────────────────
 
+class LoginSheet extends StatefulWidget {
+  const LoginSheet({super.key});
   @override
-  void initState() {
-    _email = TextEditingController();
-    _password = TextEditingController();
-    super.initState();
-  }
+  State<LoginSheet> createState() => _LoginSheetState();
+}
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    precacheImage(const AssetImage('lib/assets/loginPage.png'), context);
-    precacheImage(const AssetImage('lib/assets/emailBar.png'), context);
-    precacheImage(const AssetImage('lib/assets/passwordBar.png'), context);
-    precacheImage(const AssetImage('lib/assets/loginButton.png'), context);
-    precacheImage(const AssetImage('lib/assets/donthaveaccountText.png'), context);
-  }
+class _LoginSheetState extends State<LoginSheet> {
+  final _email    = TextEditingController();
+  final _password = TextEditingController();
+  bool _obscure  = true;
+  bool _loading  = false;
+
+  static const _bg      = Color.fromARGB(255, 33, 44, 58);
+  static const _fieldBg = Color(0xFF1A1F30);
+  static const _accent  = Color(0xFF668CEF);
+  static const _light   = Color(0xFFB0C8E0);
+  static const _primary = Color(0xFFEAEFF8);
+  static const _muted   = Color(0xFF8A96B0);
 
   @override
   void dispose() {
@@ -37,164 +42,342 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
+  Future<void> _login() async {
+    final email    = _email.text.trim();
+    final password = _password.text;
+    if (email.isEmpty || password.isEmpty) {
+      buildSnackBar(context, "Please fill in all fields.");
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: RepaintBoundary(
-              child: Image.asset('lib/assets/loginPage.png', fit: BoxFit.fill),
-            ),
-          ),
+      final user = credential.user!;
+      await user.reload();
+      final freshUser = FirebaseAuth.instance.currentUser!;
 
-          // Email Bar Image
-          Positioned(
-            bottom: screenHeight * 0.50,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Image.asset(
-                'lib/assets/emailBar.png',
-                width: screenWidth * 0.82,
-              ),
-            ),
-          ),
+      if (!mounted) return;
 
-          // Email TextFormField
-          Positioned(
-            bottom: screenHeight * 0.50,
-            left: screenHeight * 0.01,
-            right: 0,
-            child: Center(
-              child: SizedBox(
-                width: screenWidth * 0.68,
-                child: TextFormField(
-                  enableSuggestions: false,
-                  autocorrect: false,
-                  controller: _email,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    hintText: 'johnemail@gmail.com',
-                    hintStyle: TextStyle(
-                      color: Colors.grey,
-                      fontSize: screenWidth * 0.035,
+      if (freshUser.emailVerified) {
+        Navigator.pop(context);
+        Navigator.pushNamed(context, '/mainAppPage');
+      } else {
+        _showNotVerifiedDialog(freshUser);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        buildSnackBar(
+          context,
+          e.code == 'invalid-credential'
+              ? "Invalid email or password!"
+              : "Login failed. Please try again.",
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showNotVerifiedDialog(User user) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2235),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: const Icon(Icons.warning_amber_rounded,
+            color: Color(0xFFE8A838), size: 44),
+        title: const Text(
+          'Email not verified',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              color: Color(0xFFEAEFF8),
+              fontSize: 18,
+              fontWeight: FontWeight.w700),
+        ),
+        content: const Text(
+          'Your email has not been verified yet.\n\nCheck your inbox and click the link we sent.\n\n⚠️ Skipping will limit your access to certain features.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              color: Color(0xFF8A96B0), fontSize: 13, height: 1.6),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      try {
+                        await user.sendEmailVerification();
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          buildSnackBar(
+                            context,
+                            "Verification email resent!",
+                            backgroundColor:
+                                const Color.fromARGB(255, 99, 167, 255),
+                          );
+                        }
+                      } catch (_) {}
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF668CEF),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
+                    child: const Text('Resend verification email',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
                   ),
                 ),
-              ),
-            ),
-          ),
-
-          Positioned(
-            bottom: screenHeight * 0.40,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Image.asset(
-                'lib/assets/passwordBar.png',
-                width: screenWidth * 0.82,
-              ),
-            ),
-          ),
-
-          Positioned(
-            bottom: screenHeight * 0.395,
-            left: screenHeight * 0.01,
-            right: 0,
-            child: Center(
-              child: SizedBox(
-                width: screenWidth * 0.68,
-                child: TextFormField(
-                  obscureText: true,
-                  enableSuggestions: false,
-                  autocorrect: false,
-                  controller: _password,
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    hintText: '**********',
-                    hintStyle: TextStyle(
-                      color: Colors.grey,
-                      fontSize: screenWidth * 0.035,
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);     // close dialog
+                      Navigator.pop(context); // close sheet
+                      Navigator.pushNamed(context, '/mainAppPage');
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF8A96B0),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
+                    child: const Text('Skip for now (limited features)',
+                        style: TextStyle(fontSize: 13)),
                   ),
                 ),
-              ),
-            ),
-          ),
-
-          Positioned(
-            bottom: screenHeight * 0.25,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () async {
-                  final email = _email.text;
-                  final password = _password.text;
-                  try {
-                    await FirebaseAuth.instance.signInWithEmailAndPassword(
-                      email: email,
-                      password: password,
-                    );
-                    Navigator.pushNamed(context, '/mainAppPage');
-                  } on FirebaseAuthException catch (e) {
-                    if (e.code == 'invalid-credential') {
-                      buildSnackBar(context, "Invalid email or password!");
-                    }
-                  }
-                },
-                child: Image.asset(
-                  'lib/assets/loginButton.png',
-                  width: screenWidth * 0.5,
-                ),
-              ),
-            ),
-          ),
-
-          Positioned(
-            bottom: screenHeight * 0.20,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  Navigator.pushNamed(context, '/setupPage/registerPage');
-                },
-                child: Image.asset(
-                  'lib/assets/donthaveaccountText.png',
-                  width: screenWidth * 0.75,
-                ),
-              ),
+              ],
             ),
           ),
         ],
       ),
-      floatingActionButton: SizedBox(
-        width: screenWidth * 0.15,
-        height: screenWidth * 0.15,
-        child: FloatingActionButton(
-          onPressed: () {
-            Navigator.pushNamed(context, '/setupPage');
-          },
-          backgroundColor: const Color.fromARGB(255, 255, 255, 255),
-          child: Icon(
-            Icons.arrow_circle_left_rounded,
-            color: const Color.fromARGB(255, 85, 125, 199),
-            size: screenWidth * 0.08,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq       = MediaQuery.of(context);
+    final screenH  = mq.size.height;
+    final screenW  = mq.size.width;
+    final keyboard = mq.viewInsets.bottom;
+    final navBar   = mq.padding.bottom;
+
+    return Container(
+      height: screenH * 0.67,
+      decoration: const BoxDecoration(
+        color: _bg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: CustomPaint(
+              size: Size(screenW, 150),
+              painter: _WavePainter(
+                const Color.fromARGB(255, 178, 205, 240).withOpacity(0.9),
+              ),
+            ),
           ),
+          SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(28, 12, 28, keyboard + navBar + 24),
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 38, height: 4,
+                    decoration: BoxDecoration(
+                      color: _muted.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                Row(children: [
+                  Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: _accent.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _accent.withOpacity(0.3)),
+                    ),
+                    child: const Icon(Icons.notes_rounded,
+                        color: _light, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Welcome back',
+                          style: TextStyle(
+                              color: _primary,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3)),
+                      Text('Sign in to Note Junto',
+                          style: TextStyle(color: _muted, fontSize: 13)),
+                    ],
+                  ),
+                ]),
+
+                const SizedBox(height: 28),
+
+                const Text('EMAIL',
+                    style: TextStyle(color: _muted, fontSize: 11,
+                        fontWeight: FontWeight.w600, letterSpacing: 1.4)),
+                const SizedBox(height: 8),
+                _field(
+                  controller: _email,
+                  hint: 'johndoe@gmail.com',
+                  type: TextInputType.emailAddress,
+                  icon: Icons.mail_outline_rounded,
+                ),
+
+                const SizedBox(height: 18),
+
+                const Text('PASSWORD',
+                    style: TextStyle(color: _muted, fontSize: 11,
+                        fontWeight: FontWeight.w600, letterSpacing: 1.4)),
+                const SizedBox(height: 8),
+                _field(
+                  controller: _password,
+                  hint: '••••••••••',
+                  obscure: _obscure,
+                  icon: Icons.lock_outline_rounded,
+                  suffix: GestureDetector(
+                    onTap: () => setState(() => _obscure = !_obscure),
+                    child: Icon(
+                      _obscure
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: _muted, size: 20,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _loading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _accent,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: _accent.withOpacity(0.5),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: _loading
+                        ? const SizedBox(
+                            width: 20, height: 20,
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2))
+                        : const Text('Sign In',
+                            style: TextStyle(fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.3)),
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+                Center(
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: RichText(
+                      text: const TextSpan(
+                        text: "Don't have an account?  ",
+                        style: TextStyle(color: _muted, fontSize: 13),
+                        children: [
+                          TextSpan(
+                            text: 'Register',
+                            style: TextStyle(color: _light,
+                                fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    TextInputType type = TextInputType.text,
+    bool obscure = false,
+    Widget? suffix,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _fieldBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _accent.withOpacity(0.2)),
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: type,
+        obscureText: obscure,
+        enableSuggestions: false,
+        autocorrect: false,
+        style: const TextStyle(color: _primary, fontSize: 15),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: _muted, fontSize: 15),
+          prefixIcon: Icon(icon, color: _muted, size: 20),
+          suffixIcon: suffix != null
+              ? Padding(
+                  padding: const EdgeInsets.only(right: 12), child: suffix)
+              : null,
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
       ),
     );
   }
+}
+
+
+class _WavePainter extends CustomPainter {
+  final Color color;
+  const _WavePainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(0, size.height * 0.55)
+      ..quadraticBezierTo(
+          size.width * 0.25, 0, size.width * 0.5, size.height * 0.45)
+      ..quadraticBezierTo(
+          size.width * 0.75, size.height * 0.9, size.width, size.height * 0.35)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_WavePainter o) => o.color != color;
 }

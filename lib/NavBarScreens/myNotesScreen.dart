@@ -3,15 +3,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:notesharingapp/widgets/note_color_picker.dart';
 
 class MyNotesPage extends StatefulWidget {
-  const MyNotesPage({super.key});
+  final String searchQuery;
+
+  const MyNotesPage({super.key, this.searchQuery = ''});
 
   @override
   State<MyNotesPage> createState() => _MyNotesPageState();
 }
 
-// Extracts plain text from Quill Delta JSON string, limited to [maxChars]
 String extractPreview(String deltaJson, {int maxChars = 80}) {
   try {
     final List ops = jsonDecode(deltaJson);
@@ -42,6 +44,8 @@ class NoteCard extends StatelessWidget {
   final bool isShared;
   final bool isSelectionMode;
   final bool isSelected;
+  final String searchQuery;
+  final Color noteColor;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -55,10 +59,80 @@ class NoteCard extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     required this.onLongPress,
+    this.searchQuery = '',
+    this.noteColor = const Color(0xFFFCE594),
   });
+
+  Widget _highlightedText(
+    String text,
+    String query, {
+    TextStyle? baseStyle,
+    int? maxLines,
+  }) {
+    if (query.isEmpty) {
+      return Text(
+        text,
+        maxLines: maxLines,
+        overflow: maxLines != null ? TextOverflow.ellipsis : null,
+        style: baseStyle,
+      );
+    }
+
+    final lowerText = text.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    final spans = <TextSpan>[];
+    int start = 0;
+
+    while (true) {
+      final index = lowerText.indexOf(lowerQuery, start);
+      if (index == -1) {
+        spans.add(TextSpan(text: text.substring(start), style: baseStyle));
+        break;
+      }
+      if (index > start) {
+        spans.add(
+          TextSpan(text: text.substring(start, index), style: baseStyle),
+        );
+      }
+      spans.add(
+        TextSpan(
+          text: text.substring(index, index + query.length),
+          style: (baseStyle ?? const TextStyle()).copyWith(
+            backgroundColor: const Color.fromARGB(255, 255, 230, 100),
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+      );
+      start = index + query.length;
+    }
+
+    return RichText(
+      maxLines: maxLines,
+      overflow: maxLines != null ? TextOverflow.ellipsis : TextOverflow.clip,
+      text: TextSpan(children: spans),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final cardColor = isSelected
+        ? const Color.fromARGB(255, 255, 180, 180)
+        : noteColor;
+
+    final titleStyle = TextStyle(
+      color: isSelected ? Colors.red.shade800 : Colors.black,
+      decoration: isSelected ? TextDecoration.lineThrough : null,
+      decorationColor: Colors.red,
+      decorationThickness: 2,
+    );
+
+    final descStyle = TextStyle(
+      color: isSelected ? Colors.red.shade700 : Colors.black87,
+      decoration: isSelected ? TextDecoration.lineThrough : null,
+      decorationColor: Colors.red,
+    );
+
     return Padding(
       padding: const EdgeInsets.all(10),
       child: Stack(
@@ -66,9 +140,7 @@ class NoteCard extends StatelessWidget {
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
-              color: isSelected
-                  ? const Color.fromARGB(255, 255, 180, 180)
-                  : const Color.fromARGB(255, 252, 229, 148),
+              color: cardColor,
               borderRadius: BorderRadius.circular(15),
               border: isSelected
                   ? Border.all(color: Colors.red, width: 2)
@@ -79,29 +151,19 @@ class NoteCard extends StatelessWidget {
               leading: isSelected
                   ? const Icon(Icons.delete_outline, color: Colors.red)
                   : const Icon(Icons.note),
-              title: Text(
+              title: _highlightedText(
                 title,
-                style: TextStyle(
-                  color: isSelected ? Colors.red.shade800 : Colors.black,
-                  decoration: isSelected ? TextDecoration.lineThrough : null,
-                  decorationColor: Colors.red,
-                  decorationThickness: 2,
-                ),
+                searchQuery,
+                baseStyle: titleStyle,
               ),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  _highlightedText(
                     description,
+                    searchQuery,
+                    baseStyle: descStyle,
                     maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: isSelected ? Colors.red.shade700 : Colors.black87,
-                      decoration: isSelected
-                          ? TextDecoration.lineThrough
-                          : null,
-                      decorationColor: Colors.red,
-                    ),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -183,7 +245,6 @@ class _MyNotesPageState extends State<MyNotesPage> {
     'notes',
   );
 
-  // Only fetch notes belonging to the current user
   final String? _currentUserUid = FirebaseAuth.instance.currentUser?.uid;
 
   bool _isSelectionMode = false;
@@ -296,8 +357,18 @@ class _MyNotesPageState extends State<MyNotesPage> {
               );
             }
 
-            final docs = snapshot.data?.docs ?? [];
-            if (docs.isEmpty) {
+            final allDocs = snapshot.data?.docs ?? [];
+
+            final docs = widget.searchQuery.isEmpty
+                ? allDocs
+                : allDocs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final title = (data['title'] as String? ?? '')
+                        .toLowerCase();
+                    return title.contains(widget.searchQuery.toLowerCase());
+                  }).toList();
+
+            if (allDocs.isEmpty) {
               return const Center(
                 child: Text(
                   'No notes yet.\nTap + to create one!',
@@ -306,6 +377,30 @@ class _MyNotesPageState extends State<MyNotesPage> {
                     color: Color.fromARGB(255, 177, 206, 255),
                     fontSize: 16,
                   ),
+                ),
+              );
+            }
+
+            if (docs.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.search_off_rounded,
+                      color: Color.fromARGB(255, 177, 206, 255),
+                      size: 48,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No notes match "${widget.searchQuery}"',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color.fromARGB(255, 177, 206, 255),
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
                 ),
               );
             }
@@ -322,6 +417,12 @@ class _MyNotesPageState extends State<MyNotesPage> {
                 final updatedAt = data['updatedAt'] as Timestamp?;
                 final isSelected = _selectedNoteIds.contains(doc.id);
 
+                // Read saved color, fall back to default yellow
+                final colorHex = data['noteColor'] as String?;
+                final noteColor = colorHex != null
+                    ? hexToColor(colorHex)
+                    : kNoteColors[0];
+
                 return NoteCard(
                   title: title,
                   description: extractPreview(bodyJson),
@@ -329,6 +430,8 @@ class _MyNotesPageState extends State<MyNotesPage> {
                   isShared: isShared,
                   isSelectionMode: _isSelectionMode,
                   isSelected: isSelected,
+                  searchQuery: widget.searchQuery,
+                  noteColor: noteColor,
                   onLongPress: () {
                     if (!_isSelectionMode) {
                       setState(() => _isSelectionMode = true);

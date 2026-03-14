@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:notesharingapp/utils/SnackBarUtils.dart';
+import 'package:notesharingapp/screens/loginPage.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -34,10 +35,74 @@ class RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
+  // Shows a simple dialog then opens the login sheet when dismissed
+  void _showVerificationPrompt(String email) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2235),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: const Icon(
+          Icons.mark_email_unread_outlined,
+          color: Color(0xFFB0C8E0),
+          size: 44,
+        ),
+        title: const Text(
+          'Verify your email',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(0xFFEAEFF8),
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'A verification link has been sent to\n$email\n\nPlease check your inbox and click the link to activate your account.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Color(0xFF8A96B0),
+            fontSize: 13,
+            height: 1.6,
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx); // close dialog
+                  showLoginSheet(context); // open login sheet
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7B9EC2),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text(
+                  'Got it — Sign in',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Stack(
@@ -46,6 +111,7 @@ class RegisterPageState extends State<RegisterPage> {
             child: Image.asset('lib/assets/registerPage.png', fit: BoxFit.fill),
           ),
 
+          // Username bar image
           Positioned(
             bottom: screenHeight * 0.61,
             left: 0,
@@ -58,6 +124,7 @@ class RegisterPageState extends State<RegisterPage> {
             ),
           ),
 
+          // Username field
           Positioned(
             bottom: screenHeight * 0.605,
             left: screenHeight * 0.05,
@@ -82,6 +149,7 @@ class RegisterPageState extends State<RegisterPage> {
             ),
           ),
 
+          // Email bar image
           Positioned(
             bottom: screenHeight * 0.53,
             left: 0,
@@ -94,6 +162,7 @@ class RegisterPageState extends State<RegisterPage> {
             ),
           ),
 
+          // Email field
           Positioned(
             bottom: screenHeight * 0.525,
             left: screenHeight * 0.05,
@@ -121,6 +190,7 @@ class RegisterPageState extends State<RegisterPage> {
             ),
           ),
 
+          // Password bar image
           Positioned(
             bottom: screenHeight * 0.455,
             left: 0,
@@ -133,6 +203,7 @@ class RegisterPageState extends State<RegisterPage> {
             ),
           ),
 
+          // Password field
           Positioned(
             bottom: screenHeight * 0.45,
             left: screenHeight * 0.05,
@@ -160,6 +231,7 @@ class RegisterPageState extends State<RegisterPage> {
             ),
           ),
 
+          // Confirm password bar image
           Positioned(
             bottom: screenHeight * 0.375,
             left: 0,
@@ -172,6 +244,7 @@ class RegisterPageState extends State<RegisterPage> {
             ),
           ),
 
+          // Confirm password field
           Positioned(
             bottom: screenHeight * 0.37,
             left: screenHeight * 0.05,
@@ -197,6 +270,7 @@ class RegisterPageState extends State<RegisterPage> {
             ),
           ),
 
+          // Register button
           Positioned(
             bottom: screenHeight * 0.275,
             left: 0,
@@ -223,7 +297,6 @@ class RegisterPageState extends State<RegisterPage> {
                             password: password,
                           );
 
-                      // Save user to Firestore with UID as document ID
                       await FirebaseFirestore.instance
                           .collection('users')
                           .doc(userCredential.user!.uid)
@@ -234,27 +307,17 @@ class RegisterPageState extends State<RegisterPage> {
                             'createdAt': FieldValue.serverTimestamp(),
                           });
 
+                      // Send verification link
+                      await userCredential.user!.sendEmailVerification();
+
                       if (mounted) {
-                        buildSnackBar(
-                          context,
-                          "Account created successfully!",
-                          backgroundColor: const Color.fromARGB(
-                            255,
-                            99,
-                            167,
-                            255,
-                          ),
-                        );
-                        Navigator.pushReplacementNamed(
-                          context,
-                          '/setupPage/loginPage',
-                        );
+                        _showVerificationPrompt(email);
                       }
                     } on FirebaseAuthException catch (e) {
                       if (e.code == 'weak-password') {
                         buildSnackBar(
                           context,
-                          "Use a stronger password , 8-16 characters",
+                          "Use a stronger password, 8-16 characters",
                         );
                       } else if (e.code == 'email-already-in-use') {
                         buildSnackBar(context, "Email already in use");
@@ -265,7 +328,7 @@ class RegisterPageState extends State<RegisterPage> {
                   } else {
                     buildSnackBar(
                       context,
-                      "Password and confirm password doesnt match",
+                      "Password and confirm password don't match",
                     );
                   }
                 },
@@ -277,6 +340,7 @@ class RegisterPageState extends State<RegisterPage> {
             ),
           ),
 
+          // Already have an account
           Positioned(
             bottom: screenHeight * 0.20,
             left: 0,
@@ -284,9 +348,7 @@ class RegisterPageState extends State<RegisterPage> {
             child: Center(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  Navigator.pushNamed(context, '/setupPage/loginPage');
-                },
+                onTap: () => showLoginSheet(context),
                 child: Image.asset(
                   'lib/assets/alreadyhaveaccountText.png',
                   width: screenWidth * 0.75,
@@ -300,9 +362,7 @@ class RegisterPageState extends State<RegisterPage> {
         width: screenWidth * 0.15,
         height: screenWidth * 0.15,
         child: FloatingActionButton(
-          onPressed: () {
-            Navigator.pushNamed(context, '/setupPage');
-          },
+          onPressed: () => Navigator.pushNamed(context, '/setupPage'),
           backgroundColor: const Color.fromARGB(255, 255, 255, 255),
           child: Icon(
             Icons.arrow_circle_left_rounded,

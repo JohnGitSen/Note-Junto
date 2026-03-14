@@ -17,9 +17,10 @@ void main() async {
   runApp(const MyApp());
   print(
     'Firebase initialized: ${Firebase.app().name}',
-  ); // Kapag [DEFAULT] goods siya :) , Initialization ng firebase to
+  ); // Kapag [DEFAULT] goods siya :) , Dito nag start ung pag create ng implementation or pagpasok ng firebase.
 }
 
+// For Smooth Transition or Style ng pag change ng page.
 Route _smoothRoute(Widget page) {
   return PageRouteBuilder(
     transitionDuration: const Duration(milliseconds: 300),
@@ -47,6 +48,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      // For flutterquil localization for language.
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -58,6 +60,9 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
+
+      // For changing pages , Initial route natin yung landing page
+      // Dito na rin ung pag create ng routes ng ibang pages.
       initialRoute: '/',
       onGenerateRoute: (settings) {
         switch (settings.name) {
@@ -66,7 +71,6 @@ class MyApp extends StatelessWidget {
           case '/setupPage':
             return _smoothRoute(Setuppage());
           case '/setupPage/loginPage':
-            return _smoothRoute(LoginPage());
           case '/setupPage/registerPage':
             return _smoothRoute(RegisterPage());
           case '/mainAppPage':
@@ -74,6 +78,8 @@ class MyApp extends StatelessWidget {
           case '/landingPage/mainAppPage/CreateNotesPage':
             return _smoothRoute(CreateNotesPage());
           case '/editViewNotesScreen':
+            // Mostly kaya ako ng switch case para dun sa opening notes , since nasisira siya when wala condition or
+            // Map args para i pass ung noteid, title, and body galing sa editviewnotes screen function
             final args = settings.arguments as Map<String, dynamic>;
             return _smoothRoute(
               EditViewNotesScreen(

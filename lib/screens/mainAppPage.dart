@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:notesharingapp/NavBarScreens/myNotesScreen.dart';
 import 'package:notesharingapp/NavBarScreens/settingScreen.dart';
 import 'package:notesharingapp/NavBarScreens/sharedNotesScreen.dart';
+import 'package:notesharingapp/NavBarScreens/myAccountPage.dart';
 
 class MainAppPage extends StatefulWidget {
   const MainAppPage({super.key});
@@ -16,6 +17,11 @@ class _MainAppPageState extends State<MainAppPage> {
   int _selectedIndex = 0;
   String _username = '';
   Color _avatarColor = Colors.blueGrey;
+
+  // Search state
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   static const List<Color> _avatarColors = [
     Color.fromARGB(255, 99, 136, 255),
@@ -32,6 +38,12 @@ class _MainAppPageState extends State<MainAppPage> {
   void initState() {
     super.initState();
     _loadUsername();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUsername() async {
@@ -58,6 +70,10 @@ class _MainAppPageState extends State<MainAppPage> {
   void _selectionBottomBar(int index) {
     setState(() {
       _selectedIndex = index;
+      // Exit search when switching tabs
+      _isSearching = false;
+      _searchQuery = '';
+      _searchController.clear();
     });
   }
 
@@ -95,7 +111,9 @@ class _MainAppPageState extends State<MainAppPage> {
       items: [
         PopupMenuItem(
           onTap: () {
-            // Navigate to view account screen
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const MyAccountPage()));
           },
           child: Row(
             children: const [
@@ -137,62 +155,122 @@ class _MainAppPageState extends State<MainAppPage> {
     );
   }
 
-  final List<Widget> _navBarScreensList = [
-    MyNotesPage(),
-    SharedNotesPage(),
-    SettingsPage(),
-  ];
+  void _startSearch() {
+    setState(() {
+      _isSearching = true;
+    });
+  }
+
+  void _stopSearch() {
+    setState(() {
+      _isSearching = false;
+      _searchQuery = '';
+      _searchController.clear();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final firstLetter = _username.isNotEmpty ? _username[0].toUpperCase() : '?';
 
+    // Only show search on My Notes tab (index 0)
+    final bool canSearch = _selectedIndex == 0;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Notes"),
-        titleTextStyle: const TextStyle(
-          color: Color.fromARGB(255, 177, 206, 255),
-          fontSize: 20,
-        ),
         backgroundColor: const Color.fromARGB(255, 38, 47, 66),
         automaticallyImplyLeading: false,
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            onPressed: () => _showUserMenu(ctx),
-            icon: CircleAvatar(
-              backgroundColor: _avatarColor,
-              radius: 18,
-              child: Text(
-                firstLetter,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+        leading: _isSearching
+            ? IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: Color.fromARGB(255, 177, 206, 255),
+                ),
+                onPressed: _stopSearch,
+              )
+            : Builder(
+                builder: (ctx) => IconButton(
+                  onPressed: () => _showUserMenu(ctx),
+                  icon: CircleAvatar(
+                    backgroundColor: _avatarColor,
+                    radius: 18,
+                    child: Text(
+                      firstLetter,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        ),
-        actions: <Widget>[
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.refresh_rounded,
-              color: Color.fromARGB(255, 177, 206, 255),
-              size: 30,
-            ),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.search_rounded,
-              color: Color.fromARGB(255, 177, 206, 255),
-              size: 30,
-            ),
-          ),
-        ],
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                cursorColor: const Color.fromARGB(255, 177, 206, 255),
+                decoration: const InputDecoration(
+                  hintText: 'Search notes...',
+                  hintStyle: TextStyle(
+                    color: Color.fromARGB(255, 130, 150, 180),
+                  ),
+                  border: InputBorder.none,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.trim();
+                  });
+                },
+              )
+            : const Text(
+                "My Notes",
+                style: TextStyle(
+                  color: Color.fromARGB(255, 177, 206, 255),
+                  fontSize: 20,
+                ),
+              ),
+        actions: _isSearching
+            ? [
+                // Clear button when text is present
+                if (_searchQuery.isNotEmpty)
+                  IconButton(
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Color.fromARGB(255, 177, 206, 255),
+                    ),
+                  ),
+              ]
+            : [
+                IconButton(
+                  onPressed: () {},
+                  icon: const Icon(
+                    Icons.refresh_rounded,
+                    color: Color.fromARGB(255, 177, 206, 255),
+                    size: 30,
+                  ),
+                ),
+                if (canSearch)
+                  IconButton(
+                    onPressed: _startSearch,
+                    icon: const Icon(
+                      Icons.search_rounded,
+                      color: Color.fromARGB(255, 177, 206, 255),
+                      size: 30,
+                    ),
+                  ),
+              ],
       ),
-      body: _navBarScreensList[_selectedIndex],
+      body: _selectedIndex == 0
+          ? MyNotesPage(searchQuery: _searchQuery)
+          : _selectedIndex == 1
+          ? const SharedNotesPage()
+          : const SettingsPage(),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: const Color.fromARGB(255, 38, 47, 66),
         selectedItemColor: const Color.fromARGB(255, 197, 225, 233),

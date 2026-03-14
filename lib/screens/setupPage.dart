@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:notesharingapp/screens/loginPage.dart';
 
 class Setuppage extends StatefulWidget {
   const Setuppage({super.key});
@@ -9,10 +10,11 @@ class Setuppage extends StatefulWidget {
 class _SetuppageState extends State<Setuppage> {
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+    final screenWidth  = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned.fill(
@@ -22,44 +24,34 @@ class _SetuppageState extends State<Setuppage> {
           // Create an account button
           Positioned(
             bottom: screenHeight * 0.35,
-            left: 0,
-            right: 0,
+            left: 0, right: 0,
             child: Center(
               child: GestureDetector(
-                onTap: () {
-                  Navigator.pushNamed(context, '/setupPage/registerPage');
-                },
-                child: Image.asset(
-                  'lib/assets/registeraccountButton.png',
-                  width: screenWidth * 0.50,
-                ),
+                onTap: () =>
+                    Navigator.pushNamed(context, '/setupPage/registerPage'),
+                child: Image.asset('lib/assets/registeraccountButton.png',
+                    width: screenWidth * 0.50),
               ),
             ),
           ),
 
+          // Login button — calls showLoginSheet from login_page.dart
           Positioned(
-            bottom: screenHeight * 0.22, 
-            left: 0,
-            right: 0,
+            bottom: screenHeight * 0.22,
+            left: 0, right: 0,
             child: Center(
               child: GestureDetector(
-                onTap: () {
-                  Navigator.pushNamed(context, '/setupPage/loginPage');
-                },
-                child: Image.asset(
-                  'lib/assets/loginaccountButton.png',
-                  width: screenWidth * 0.50,
-                ),
+                onTap: () => showLoginSheet(context),
+                child: Image.asset('lib/assets/loginaccountButton.png',
+                    width: screenWidth * 0.50),
               ),
             ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(context, '/');
-        },
-        backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+        onPressed: () => Navigator.pushNamed(context, '/'),
+        backgroundColor: Colors.white,
         child: Icon(
           Icons.arrow_circle_left_rounded,
           color: const Color.fromARGB(255, 85, 125, 199),
