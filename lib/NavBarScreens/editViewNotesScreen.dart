@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:notesharingapp/widgets/base64_image_embed.dart';
 import 'package:notesharingapp/widgets/note_color_picker.dart';
 import 'package:notesharingapp/widgets/note_comments_panel.dart';
+import 'package:notesharingapp/widgets/note_pdf_exporter.dart'; // <-- new import
 import 'package:notesharingapp/widgets/presence_avatar.dart';
 import 'package:notesharingapp/widgets/share_dialog.dart';
 
@@ -322,6 +323,76 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
     );
   }
 
+  /// Shows a bottom sheet letting the user pick Save or Export to PDF.
+  void _showSaveOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color.fromARGB(255, 38, 47, 66),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Text(
+                'Save Options',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.save_rounded,
+                color: Color.fromARGB(255, 172, 202, 255),
+              ),
+              title: const Text(
+                'Save Note',
+                style: TextStyle(color: Colors.white),
+              ),
+              subtitle: const Text(
+                'Save changes to the cloud',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _saveNote();
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.picture_as_pdf_rounded,
+                color: Color.fromARGB(255, 172, 202, 255),
+              ),
+              title: const Text(
+                'Export as PDF',
+                style: TextStyle(color: Colors.white),
+              ),
+              subtitle: const Text(
+                'Preview, share or download as PDF',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                NotePdfExporter.export(
+                  context: context,
+                  controller: _controller,
+                  title: _titleController.text.trim(),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     if (_currentUid != null) {
@@ -459,26 +530,18 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
                     size: 28,
                   ),
                 ),
-          _isSaving
-              ? const Padding(
-                  padding: EdgeInsets.all(14),
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Color.fromARGB(255, 172, 202, 255),
-                    ),
-                  ),
-                )
-              : IconButton(
-                  onPressed: _saveNote,
-                  icon: const Icon(
-                    Icons.save_rounded,
-                    color: Color.fromARGB(255, 172, 202, 255),
-                    size: 30,
-                  ),
-                ),
+IconButton(
+  onPressed: () => NotePdfExporter.export(
+    context: context,
+    controller: _controller,
+    title: _titleController.text.trim(),
+  ),
+  icon: const Icon(
+    Icons.picture_as_pdf_rounded,
+    color: Color.fromARGB(255, 172, 202, 255),
+    size: 30,
+  ),
+),
           IconButton(
             onPressed: () => openShareDialog(context, _sharedWith, () {
               setState(() {});

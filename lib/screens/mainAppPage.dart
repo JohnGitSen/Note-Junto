@@ -247,14 +247,15 @@ class _MainAppPageState extends State<MainAppPage> {
                   ),
               ]
             : [
-                IconButton(
-                  onPressed: () {},
-                  icon: const Icon(
-                    Icons.refresh_rounded,
-                    color: Color.fromARGB(255, 177, 206, 255),
-                    size: 30,
+                if (_selectedIndex != 2)
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      color: Color.fromARGB(255, 177, 206, 255),
+                      size: 30,
+                    ),
                   ),
-                ),
                 if (canSearch)
                   IconButton(
                     onPressed: _startSearch,
