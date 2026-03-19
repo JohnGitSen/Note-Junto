@@ -205,7 +205,6 @@ class _SharedNotesPageState extends State<SharedNotesPage> {
     });
   }
 
-  // Removes current user from sharedWith instead of deleting the note
   Future<void> _removeSelected() async {
     final confirmed = await showDialog<bool>(
       context: context,

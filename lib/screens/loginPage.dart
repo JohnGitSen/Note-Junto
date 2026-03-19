@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:notesharingapp/utils/SnackBarUtils.dart';
 
-// ── Call this from any page to show the login sheet ──────────────────────────
+// Ginawa ko na siya function that can be called para
+// ma recall ko nalang siya sa register page
+
 void showLoginSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
@@ -13,8 +15,6 @@ void showLoginSheet(BuildContext context) {
     builder: (_) => const LoginSheet(),
   );
 }
-
-// ─── Login Sheet (public) ─────────────────────────────────────────────────────
 
 class LoginSheet extends StatefulWidget {
   const LoginSheet({super.key});
@@ -29,6 +29,9 @@ class _LoginSheetState extends State<LoginSheet> {
   bool _loading = false;
   String? _errorMessage;
 
+  // Colors ng mga compoments para dun sa login
+  // Draggable Bottom Sheet
+
   static const _bg = Color.fromARGB(255, 33, 44, 58);
   static const _fieldBg = Color(0xFF1A1F30);
   static const _accent = Color(0xFF668CEF);
@@ -38,6 +41,9 @@ class _LoginSheetState extends State<LoginSheet> {
   static const _error = Color(0xFFFF5C5C);
 
   @override
+  // For error message , like ung lumalabas na error sa email field
+  // tapos once na meron magtype or maglagay ma cle-clear or mawawala
+
   void initState() {
     super.initState();
     _email.addListener(_clearError);
@@ -64,10 +70,17 @@ class _LoginSheetState extends State<LoginSheet> {
     }
     setState(() => _loading = true);
     try {
+
+      // Dito natin binibigay sa firebase auth ung info or email & password and it get's passed
+      // sa firebase para i check kung existing , valid siya.
+
       final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      // Iniinitialized niya ung user na nag logged in just now as the default
+      // or ung fresh na latest user data
 
       final user = credential.user!;
       await user.reload();
@@ -75,12 +88,17 @@ class _LoginSheetState extends State<LoginSheet> {
 
       if (!mounted) return;
 
+      // Checks if ung user ay verified , if yes continue. 
+      // Kung hindi magbibigay siya ng prompt
+
       if (freshUser.emailVerified) {
         Navigator.pop(context);
         Navigator.pushNamed(context, '/mainAppPage');
       } else {
         _showNotVerifiedDialog(freshUser);
-      }
+      } // Once na maipasa ung email at password sa fireauth , Kapag invalid
+      // normally magbibigay yun ng exception sa console. Dito inaano once na may ma catch na exception
+      // sasabihin niya "invalid" error message. 
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         setState(() {
@@ -94,6 +112,8 @@ class _LoginSheetState extends State<LoginSheet> {
     }
   }
 
+  // Eto ung compoment basically ng pagshow ng 
+  // error message once di ka verified
   void _showNotVerifiedDialog(User user) {
     showDialog(
       context: context,
@@ -131,6 +151,7 @@ class _LoginSheetState extends State<LoginSheet> {
                   child: ElevatedButton(
                     onPressed: () async {
                       try {
+                        // Resend ng emailverification link takes place here
                         await user.sendEmailVerification();
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
@@ -202,6 +223,7 @@ class _LoginSheetState extends State<LoginSheet> {
 
     final bool hasError = _errorMessage != null;
 
+    // Eto ung buong frame or design ng login bottom bar
     return Container(
       height: screenH * 0.67,
       decoration: const BoxDecoration(
@@ -290,7 +312,7 @@ class _LoginSheetState extends State<LoginSheet> {
                 ),
                 const SizedBox(height: 8),
 
-                // ── Email field with red border on error ──────────────────────
+                // Email field border red error effect
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   decoration: BoxDecoration(
@@ -335,7 +357,7 @@ class _LoginSheetState extends State<LoginSheet> {
                   ),
                 ),
 
-                // ── Red error text below email field ──────────────────────────
+                // Red error text above email field
                 AnimatedSize(
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOut,
@@ -500,6 +522,8 @@ class _LoginSheetState extends State<LoginSheet> {
     );
   }
 }
+
+// Wave design kemerut lang to 
 
 class _WavePainter extends CustomPainter {
   final Color color;

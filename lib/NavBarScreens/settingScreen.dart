@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:notesharingapp/widgets/note_color_picker.dart';
+import 'package:notesharingapp/screens/restore_archive_page.dart';
 
 enum NotesSortOrder { updatedDesc, updatedAsc, titleAsc, titleDesc }
 
@@ -32,7 +32,6 @@ class _SettingsPageState extends State<SettingsPage> {
   final _firestore = FirebaseFirestore.instance;
 
   String _username = '';
-  Color _defaultNoteColor = kNoteColors[0];
   NotesSortOrder _sortOrder = NotesSortOrder.updatedDesc;
   bool _loading = true;
 
@@ -50,14 +49,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (userDoc.exists && mounted) {
       final data = userDoc.data() as Map<String, dynamic>;
-      final colorHex = data['defaultNoteColor'] as String?;
       final sortStr = data['sortOrder'] as String?;
 
       setState(() {
         _username = data['username'] as String? ?? '';
-        _defaultNoteColor = colorHex != null
-            ? hexToColor(colorHex)
-            : kNoteColors[0];
         _sortOrder = NotesSortOrder.values.firstWhere(
           (e) => e.name == sortStr,
           orElse: () => NotesSortOrder.updatedDesc,
@@ -133,113 +128,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  void _showDefaultColorPicker() {
-    Color tempColor = _defaultNoteColor;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color.fromARGB(255, 38, 47, 66),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Default Note Color',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'New notes will start with this color.',
-                style: TextStyle(
-                  color: Color.fromARGB(255, 130, 150, 180),
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: kNoteColors.map((color) {
-                  final isSelected = tempColor.value == color.value;
-                  return GestureDetector(
-                    onTap: () => setLocal(() => tempColor = color),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected
-                              ? const Color.fromARGB(255, 177, 206, 255)
-                              : Colors.white.withOpacity(0.3),
-                          width: isSelected ? 2.5 : 1.2,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: color.withOpacity(0.6),
-                                  blurRadius: 6,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: isSelected
-                          ? const Icon(
-                              Icons.check_rounded,
-                              size: 18,
-                              color: Color.fromARGB(180, 0, 0, 0),
-                            )
-                          : null,
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color.fromARGB(255, 177, 206, 255),
-                    foregroundColor: const Color.fromARGB(255, 14, 17, 22),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    await _saveToFirestore({
-                      'defaultNoteColor': colorToHex(tempColor),
-                    });
-                    if (mounted) {
-                      setState(() => _defaultNoteColor = tempColor);
-                    }
-                    _showSnack('Default color saved!');
-                  },
-                  child: const Text(
-                    'Save',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showSortOrder() {
     showModalBottomSheet(
       context: context,
@@ -283,9 +171,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     color: isSelected
                         ? const Color.fromARGB(255, 177, 206, 255)
                         : Colors.white,
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
                 trailing: isSelected
@@ -514,7 +401,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ? Colors.redAccent
             : const Color.fromARGB(255, 99, 167, 255),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -547,28 +435,24 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 24),
           _sectionLabel('Preferences'),
           _settingsTile(
-            icon: Icons.palette_outlined,
-            title: 'Default Note Color',
-            subtitle: 'Color applied to new notes',
-            trailing: Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                color: _defaultNoteColor,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.4),
-                  width: 1.5,
-                ),
-              ),
-            ),
-            onTap: _showDefaultColorPicker,
-          ),
-          _settingsTile(
             icon: Icons.sort_rounded,
             title: 'Sort Notes By',
             subtitle: _sortOrder.label,
             onTap: _showSortOrder,
+          ),
+          const SizedBox(height: 24),
+          _sectionLabel('Backup & Restore'),
+          _settingsTile(
+            icon: Icons.restore_rounded,
+            title: 'Restore Archived Notes',
+            subtitle: 'View and recover notes from your archive',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const RestoreArchivePage(),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 24),
           _sectionLabel('Danger Zone'),
@@ -625,7 +509,8 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       child: ListTile(
         onTap: onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         leading: Icon(
           icon,
           color: iconColor ?? const Color.fromARGB(255, 177, 206, 255),
@@ -646,8 +531,7 @@ class _SettingsPageState extends State<SettingsPage> {
             fontSize: 12,
           ),
         ),
-        trailing:
-            trailing ??
+        trailing: trailing ??
             const Icon(
               Icons.chevron_right_rounded,
               color: Color.fromARGB(255, 80, 100, 130),

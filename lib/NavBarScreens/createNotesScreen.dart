@@ -223,16 +223,21 @@ class _CreateNotesPageState extends State<CreateNotesPage> {
             ),
           ),
           IconButton(
-            onPressed: () =>
-                openShareDialog(context, _sharedWith, () => setState(() {})),
-            icon: Icon(
-              Icons.people,
-              color: _sharedWith.isNotEmpty
-                  ? Colors.greenAccent
-                  : const Color.fromARGB(255, 172, 202, 255),
-              size: 30,
-            ),
-          ),
+  onPressed: () => openShareDialog(
+    context,
+    _sharedWith,
+    () => setState(() {}),
+    noteId: '',
+    noteTitle: _titleController.text.trim(),
+  ),
+  icon: Icon(
+    Icons.people,
+    color: _sharedWith.isNotEmpty
+        ? Colors.greenAccent
+        : const Color.fromARGB(255, 172, 202, 255),
+    size: 30,
+  ),
+),
         ],
       ),
       body: Column(

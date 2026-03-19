@@ -78,8 +78,6 @@ class MyApp extends StatelessWidget {
           case '/landingPage/mainAppPage/CreateNotesPage':
             return _smoothRoute(CreateNotesPage());
           case '/editViewNotesScreen':
-            // Mostly kaya ako ng switch case para dun sa opening notes , since nasisira siya when wala condition or
-            // Map args para i pass ung noteid, title, and body galing sa editviewnotes screen function
             final args = settings.arguments as Map<String, dynamic>;
             return _smoothRoute(
               EditViewNotesScreen(

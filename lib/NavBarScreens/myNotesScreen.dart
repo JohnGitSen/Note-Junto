@@ -417,7 +417,6 @@ class _MyNotesPageState extends State<MyNotesPage> {
                 final updatedAt = data['updatedAt'] as Timestamp?;
                 final isSelected = _selectedNoteIds.contains(doc.id);
 
-                // Read saved color, fall back to default yellow
                 final colorHex = data['noteColor'] as String?;
                 final noteColor = colorHex != null
                     ? hexToColor(colorHex)

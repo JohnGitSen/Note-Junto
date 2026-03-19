@@ -9,7 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:notesharingapp/widgets/base64_image_embed.dart';
 import 'package:notesharingapp/widgets/note_color_picker.dart';
 import 'package:notesharingapp/widgets/note_comments_panel.dart';
-import 'package:notesharingapp/widgets/note_pdf_exporter.dart'; // <-- new import
+import 'package:notesharingapp/widgets/note_pdf_exporter.dart';
 import 'package:notesharingapp/widgets/presence_avatar.dart';
 import 'package:notesharingapp/widgets/share_dialog.dart';
 
@@ -51,14 +51,22 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
   Map<String, Map<String, dynamic>> _presenceMap = {};
   StreamSubscription? _presenceSub;
   StreamSubscription? _noteSub;
-  bool _localChange = false;
+
+  bool _isSavingLocal = false;
+  String _lastSavedBody = '';
+  String _lastSavedTitle = '';
 
   Color _noteColor = kNoteColors[0];
+
+  // Stable controller references — never recreated inline in build()
+  final ScrollController _editorScrollController = ScrollController();
+  final FocusNode _editorFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.title);
+    _lastSavedTitle = widget.title;
 
     try {
       final doc = Document.fromJson(jsonDecode(widget.body));
@@ -70,10 +78,8 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
       _controller = QuillController.basic();
     }
 
-    _controller.document.changes.listen((_) {
-      _localChange = true;
-      _onTyping();
-    });
+    _lastSavedBody = widget.body;
+    _controller.document.changes.listen((_) => _onTyping());
 
     _initPresence();
     _listenToNoteChanges();
@@ -119,44 +125,61 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
           final data = snapshot.data()!;
 
           final hex = data['noteColor'] as String?;
-          if (hex != null && !_localChange) {
+          if (hex != null) {
             final incoming = hexToColor(hex);
-            if (incoming.value != _noteColor.value) {
+            if (incoming.value != _noteColor.value && !_isSavingLocal) {
               setState(() => _noteColor = incoming);
             }
           }
 
-          if (_localChange) {
-            _localChange = false;
-            return;
-          }
+          if (_isSavingLocal) return;
 
           final newTitle = data['title'] as String? ?? '';
           final newBodyJson = data['body'] as String? ?? '[]';
 
-          if (_titleController.text != newTitle) {
+          final titleChanged = newTitle != _lastSavedTitle;
+          final bodyChanged = newBodyJson != _lastSavedBody;
+
+          if (titleChanged && _titleController.text != newTitle) {
             _titleController.text = newTitle;
+            _lastSavedTitle = newTitle;
           }
 
-          try {
-            final newDoc = Document.fromJson(jsonDecode(newBodyJson));
-            final savedSelection = _controller.selection;
+          if (bodyChanged) {
+            try {
+              final newDoc = Document.fromJson(jsonDecode(newBodyJson));
+              final docLength = newDoc.length;
 
-            final newController = QuillController(
-              document: newDoc,
-              selection: savedSelection,
-            );
+              // Clamp selection so it never exceeds the new document length.
+              // This prevents the Flutter assertion error (_elements.contains)
+              // that flashes red when a remote user deletes content and the
+              // current cursor position is now out of bounds.
+              final rawSelection = _controller.selection;
+              final safeBase = rawSelection.baseOffset
+                  .clamp(0, docLength - 1)
+                  .toInt();
+              final safeExtent = rawSelection.extentOffset
+                  .clamp(0, docLength - 1)
+                  .toInt();
 
-            newController.document.changes.listen((_) {
-              _localChange = true;
-              _onTyping();
-            });
+              final newController = QuillController(
+                document: newDoc,
+                selection: TextSelection(
+                  baseOffset: safeBase,
+                  extentOffset: safeExtent,
+                ),
+              );
 
-            setState(() {
-              _controller.dispose();
-              _controller = newController;
-            });
-          } catch (_) {}
+              newController.document.changes.listen((_) => _onTyping());
+
+              setState(() {
+                _controller.dispose();
+                _controller = newController;
+              });
+
+              _lastSavedBody = newBodyJson;
+            } catch (_) {}
+          }
         });
   }
 
@@ -225,9 +248,7 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
     });
 
     _autoSaveTimer?.cancel();
-    _autoSaveTimer = Timer(const Duration(milliseconds: 800), () {
-      _saveNote();
-    });
+    _autoSaveTimer = Timer(const Duration(milliseconds: 800), _saveNote);
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -256,11 +277,8 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
         BlockEmbed.custom(CustomBlockEmbed('base64image', base64Str)),
       );
 
-      _localChange = true;
       _autoSaveTimer?.cancel();
-      _autoSaveTimer = Timer(const Duration(milliseconds: 800), () {
-        _saveNote();
-      });
+      _autoSaveTimer = Timer(const Duration(milliseconds: 800), _saveNote);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -323,7 +341,6 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
     );
   }
 
-  /// Shows a bottom sheet letting the user pick Save or Export to PDF.
   void _showSaveOptions() {
     showModalBottomSheet(
       context: context,
@@ -409,11 +426,16 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
     _noteSub?.cancel();
     _controller.dispose();
     _titleController.dispose();
+    _editorScrollController.dispose();
+    _editorFocusNode.dispose();
     super.dispose();
   }
 
   Future<void> _saveNote() async {
-    setState(() => _isSaving = true);
+    // No setState — avoid triggering rebuilds during auto-save
+    _isSaving = true;
+    _isSavingLocal = true;
+
     try {
       final bodyJson = jsonEncode(_controller.document.toDelta().toJson());
       final sizeInKB = utf8.encode(bodyJson).length / 1024;
@@ -430,7 +452,8 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
             ),
           );
         }
-        setState(() => _isSaving = false);
+        _isSaving = false;
+        _isSavingLocal = false;
         return;
       }
 
@@ -448,18 +471,17 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
         }
       }
 
+      final titleToSave = _titleController.text.trim();
+
       await _firestore.collection('notes').doc(widget.noteId).update({
-        'title': _titleController.text.trim(),
+        'title': titleToSave,
         'body': bodyJson,
         'noteColor': colorToHex(_noteColor),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Note saved!')));
-      }
+      _lastSavedBody = bodyJson;
+      _lastSavedTitle = titleToSave;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -467,7 +489,10 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
         ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
       }
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      _isSaving = false;
+      Future.delayed(const Duration(milliseconds: 600), () {
+        _isSavingLocal = false;
+      });
     }
   }
 
@@ -530,23 +555,29 @@ class _EditViewNotesScreenState extends State<EditViewNotesScreen> {
                     size: 28,
                   ),
                 ),
-IconButton(
-  onPressed: () => NotePdfExporter.export(
-    context: context,
-    controller: _controller,
-    title: _titleController.text.trim(),
-  ),
-  icon: const Icon(
-    Icons.picture_as_pdf_rounded,
-    color: Color.fromARGB(255, 172, 202, 255),
-    size: 30,
-  ),
-),
           IconButton(
-            onPressed: () => openShareDialog(context, _sharedWith, () {
-              setState(() {});
-              _saveSharedWith();
-            }),
+            onPressed: () => NotePdfExporter.export(
+              context: context,
+              controller: _controller,
+              title: _titleController.text.trim(),
+            ),
+            icon: const Icon(
+              Icons.picture_as_pdf_rounded,
+              color: Color.fromARGB(255, 172, 202, 255),
+              size: 30,
+            ),
+          ),
+          IconButton(
+            onPressed: () => openShareDialog(
+              context,
+              _sharedWith,
+              () {
+                setState(() {});
+                _saveSharedWith();
+              },
+              noteId: widget.noteId,
+              noteTitle: _titleController.text.trim(),
+            ),
             icon: Icon(
               Icons.people,
               color: _sharedWith.isNotEmpty
@@ -599,8 +630,8 @@ IconButton(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: QuillEditor(
                     controller: _controller,
-                    scrollController: ScrollController(),
-                    focusNode: FocusNode(),
+                    scrollController: _editorScrollController,
+                    focusNode: _editorFocusNode,
                     config: QuillEditorConfig(
                       padding: const EdgeInsets.all(10),
                       embedBuilders: [Base64ImageEmbedBuilder()],

@@ -17,6 +17,8 @@ class RegisterPageState extends State<RegisterPage> {
   late final TextEditingController _password;
   late final TextEditingController _confirmpassword;
 
+  bool _isLoading = false; // ← prevents double tap
+
   @override
   void initState() {
     _username = TextEditingController();
@@ -35,7 +37,6 @@ class RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  // Shows a simple dialog then opens the login sheet when dismissed
   void _showVerificationPrompt(String email) {
     showDialog(
       context: context,
@@ -74,8 +75,8 @@ class RegisterPageState extends State<RegisterPage> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(ctx); // close dialog
-                  showLoginSheet(context); // open login sheet
+                  Navigator.pop(ctx);
+                  showLoginSheet(context);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF7B9EC2),
@@ -96,6 +97,68 @@ class RegisterPageState extends State<RegisterPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _register() async {
+    if (_isLoading) return; // block double tap
+
+    final username = _username.text.trim();
+    final email = _email.text.trim();
+    final password = _password.text;
+    final confirmpassword = _confirmpassword.text;
+
+    if (username.isEmpty) {
+      buildSnackBar(context, "Please enter a username");
+      return;
+    }
+
+    if (password.isEmpty) {
+      buildSnackBar(context, "Please enter a password");
+      return;
+    }
+
+    if (password != confirmpassword) {
+      buildSnackBar(context, "Password and confirm password don't match");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set({
+            'uid': userCredential.user!.uid,
+            'username': username,
+            'email': email,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+      await userCredential.user!.sendEmailVerification();
+
+      if (mounted) {
+        _showVerificationPrompt(email);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        if (e.code == 'weak-password') {
+          buildSnackBar(context, "Use a stronger password, 8-16 characters");
+        } else if (e.code == 'email-already-in-use') {
+          buildSnackBar(context, "Email already in use");
+        } else if (e.code == 'invalid-email') {
+          buildSnackBar(context, "Invalid Email Format");
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -179,7 +242,7 @@ class RegisterPageState extends State<RegisterPage> {
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
-                    hintText: 'johnemail@gmail.com',
+                    hintText: 'johndoe@gmail.com',
                     hintStyle: TextStyle(
                       color: Colors.grey,
                       fontSize: screenWidth * 0.035,
@@ -278,64 +341,15 @@ class RegisterPageState extends State<RegisterPage> {
             child: Center(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () async {
-                  final username = _username.text.trim();
-                  final email = _email.text.trim();
-                  final password = _password.text;
-                  final confirmpassword = _confirmpassword.text;
-
-                  if (username.isEmpty) {
-                    buildSnackBar(context, "Please enter a username");
-                    return;
-                  }
-
-                  if (password == confirmpassword) {
-                    try {
-                      final userCredential = await FirebaseAuth.instance
-                          .createUserWithEmailAndPassword(
-                            email: email,
-                            password: password,
-                          );
-
-                      await FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(userCredential.user!.uid)
-                          .set({
-                            'uid': userCredential.user!.uid,
-                            'username': username,
-                            'email': email,
-                            'createdAt': FieldValue.serverTimestamp(),
-                          });
-
-                      // Send verification link
-                      await userCredential.user!.sendEmailVerification();
-
-                      if (mounted) {
-                        _showVerificationPrompt(email);
-                      }
-                    } on FirebaseAuthException catch (e) {
-                      if (e.code == 'weak-password') {
-                        buildSnackBar(
-                          context,
-                          "Use a stronger password, 8-16 characters",
-                        );
-                      } else if (e.code == 'email-already-in-use') {
-                        buildSnackBar(context, "Email already in use");
-                      } else if (e.code == 'invalid-email') {
-                        buildSnackBar(context, "Invalid Email Format");
-                      }
-                    }
-                  } else {
-                    buildSnackBar(
-                      context,
-                      "Password and confirm password don't match",
-                    );
-                  }
-                },
-                child: Image.asset(
-                  'lib/assets/registerButton.png',
-                  width: screenWidth * 0.4,
-                ),
+                onTap: _register,
+                child: _isLoading
+                    ? const CircularProgressIndicator(
+                        color: Color.fromARGB(255, 85, 125, 199),
+                      )
+                    : Image.asset(
+                        'lib/assets/registerButton.png',
+                        width: screenWidth * 0.4,
+                      ),
               ),
             ),
           ),

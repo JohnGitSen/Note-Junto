@@ -5,6 +5,8 @@ import 'package:notesharingapp/NavBarScreens/myNotesScreen.dart';
 import 'package:notesharingapp/NavBarScreens/settingScreen.dart';
 import 'package:notesharingapp/NavBarScreens/sharedNotesScreen.dart';
 import 'package:notesharingapp/NavBarScreens/myAccountPage.dart';
+import 'package:notesharingapp/services/archive_notes_service.dart';
+import 'package:notesharingapp/widgets/share_invites_bell.dart'; // <-- new
 
 class MainAppPage extends StatefulWidget {
   const MainAppPage({super.key});
@@ -18,7 +20,6 @@ class _MainAppPageState extends State<MainAppPage> {
   String _username = '';
   Color _avatarColor = Colors.blueGrey;
 
-  // Search state
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -49,12 +50,10 @@ class _MainAppPageState extends State<MainAppPage> {
   Future<void> _loadUsername() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-
     final doc = await FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .get();
-
     if (doc.exists && mounted) {
       final username = doc.data()?['username'] as String? ?? '';
       final colorIndex = username.isNotEmpty
@@ -70,7 +69,6 @@ class _MainAppPageState extends State<MainAppPage> {
   void _selectionBottomBar(int index) {
     setState(() {
       _selectedIndex = index;
-      // Exit search when switching tabs
       _isSearching = false;
       _searchQuery = '';
       _searchController.clear();
@@ -80,9 +78,7 @@ class _MainAppPageState extends State<MainAppPage> {
   Future<void> _handleLogout() async {
     try {
       await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/');
-      }
+      if (mounted) Navigator.of(context).pushReplacementNamed('/');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -110,11 +106,9 @@ class _MainAppPageState extends State<MainAppPage> {
       ),
       items: [
         PopupMenuItem(
-          onTap: () {
-            Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const MyAccountPage()));
-          },
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const MyAccountPage())),
           child: Row(
             children: const [
               Icon(
@@ -155,11 +149,7 @@ class _MainAppPageState extends State<MainAppPage> {
     );
   }
 
-  void _startSearch() {
-    setState(() {
-      _isSearching = true;
-    });
-  }
+  void _startSearch() => setState(() => _isSearching = true);
 
   void _stopSearch() {
     setState(() {
@@ -172,8 +162,6 @@ class _MainAppPageState extends State<MainAppPage> {
   @override
   Widget build(BuildContext context) {
     final firstLetter = _username.isNotEmpty ? _username[0].toUpperCase() : '?';
-
-    // Only show search on My Notes tab (index 0)
     final bool canSearch = _selectedIndex == 0;
 
     return Scaffold(
@@ -218,11 +206,8 @@ class _MainAppPageState extends State<MainAppPage> {
                   ),
                   border: InputBorder.none,
                 ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value.trim();
-                  });
-                },
+                onChanged: (value) =>
+                    setState(() => _searchQuery = value.trim()),
               )
             : const Text(
                 "My Notes",
@@ -233,7 +218,6 @@ class _MainAppPageState extends State<MainAppPage> {
               ),
         actions: _isSearching
             ? [
-                // Clear button when text is present
                 if (_searchQuery.isNotEmpty)
                   IconButton(
                     onPressed: () {
@@ -247,6 +231,22 @@ class _MainAppPageState extends State<MainAppPage> {
                   ),
               ]
             : [
+                if (_selectedIndex == 1)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 2),
+                    child: ShareInvitesBell(),
+                  ),
+                if (_selectedIndex == 0)
+                  IconButton(
+                    onPressed: () =>
+                        ArchiveNotesService.showArchiveDialog(context),
+                    icon: const Icon(
+                      Icons.archive_rounded,
+                      color: Color.fromARGB(255, 177, 206, 255),
+                      size: 28,
+                    ),
+                    tooltip: 'Archive notes',
+                  ),
                 if (_selectedIndex != 2)
                   IconButton(
                     onPressed: () {},
